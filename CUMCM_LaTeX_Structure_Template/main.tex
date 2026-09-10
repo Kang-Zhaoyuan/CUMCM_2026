@@ -1,0 +1,48 @@
+% !TeX program = xelatex
+% 全国大学生数学建模竞赛论文结构模板
+% 说明：本模板只保留优秀论文中高频出现的行文框架，不预置具体建模内容。
+% 建议在 Overleaf 中选择 XeLaTeX 编译器。
+
+\documentclass[withoutpreface,bwprint]{cumcmthesis}
+
+% -------------------- 标准竞赛排版 --------------------
+\usepackage{cumcm2026}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+
+% -------------------- 基础版式 --------------------
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0pt}
+
+% 若需要统一图表文件夹，可直接使用 figures/ 下的文件
+\graphicspath{{figures/}}
+
+\begin{document}
+
+% 国赛电子版论文不设置目录，第一页直接从摘要开始。
+\input{sections/00_abstract}
+\newpage
+
+\input{sections/01_problem_restatement}
+\input{sections/02_problem_analysis}
+\input{sections/03_model_assumptions}
+\input{sections/04_symbols}
+\input{sections/05_data_processing}
+\input{sections/06_model_establishment_and_solution}
+\input{sections/07_model_evaluation}
+\input{sections/08_references}
+
+% -------------------- 附录 --------------------
+\appendix
+\input{appendices/appendix_A_supporting_materials}
+\input{appendices/appendix_B_supplementary_results}
+\input{appendices/appendix_C_code}
+\input{appendices/appendix_D_ai_usage_guidelines}
+
+\end{document}

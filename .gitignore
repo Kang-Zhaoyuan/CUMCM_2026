@@ -1,0 +1,42 @@
+﻿# LaTeX auxiliary files
+*.aux
+*.bbl
+*.blg
+*.idx
+*.ind
+*.ilg
+*.log
+*.out
+*.toc
+*.lot
+*.lof
+*.synctex.gz
+*.synctex(busy)
+*.fdb_latexmk
+*.fls
+*.nav
+*.snm
+*.vrb
+*.bcf
+*.run.xml
+*.xdv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+*.venv/
+venv/
+env/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
