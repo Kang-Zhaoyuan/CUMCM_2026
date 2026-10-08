@@ -1,0 +1,13 @@
+\section{支撑材料文件说明}
+\begin{table}[!htbp]\centering\small
+\caption{计算程序、结果与图件文件说明}\label{tab:support}
+\begin{tabularx}{\linewidth}{@{}lL@{}}\toprule
+文件或目录 & 内容\\\midrule
+\texttt{Problem1.py}至\texttt{Problem4.py} & 四个问题的求解程序，位于\texttt{Fianl\_From\_DYC/code/}。\\
+\texttt{grid.py} & 二维轴对称网格、界面通量、物性参数及动态几何更新。\\
+\texttt{result1.xlsx}至\texttt{result4.xlsx} & 当前保存的温度、含水率及收缩结果，位于计算工程的附件3目录。\\
+对照实验结果 & 网格规模与环境延拓点数不同的计算结果。\\
+\texttt{eda\_figures/} & 本文使用的几何、离散方法、环境边界及结果图件。\\
+\bottomrule\end{tabularx}
+\end{table}
+正文结果表从现有结果文件中按题目指定时刻和径向位置提取，表内数值统一保留四位小数。问题四中超出当前半径的位置不属于药材内部，不予赋值。

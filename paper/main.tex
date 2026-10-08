@@ -1,0 +1,68 @@
+% !TeX program = xelatex
+% 全国大学生数学建模竞赛论文结构模板
+% 说明：本模板只保留优秀论文中高频出现的行文框架，不预置具体建模内容。
+% 建议在 Overleaf 中选择 XeLaTeX 编译器。
+
+\documentclass[withoutpreface,bwprint]{cumcmthesis}
+
+% -------------------- 标准竞赛排版 --------------------
+\usepackage{cumcm2026}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{gbt7714}
+\usepackage[section]{placeins}
+\hypersetup{hidelinks}
+\title{中药材热风烘干过程的传热传质建模与烘干时长预测}
+
+% 交叉引用：将“表”和表号整体设置为可点击链接。
+\newcommand{\tabref}[1]{\hyperref[#1]{表~\ref*{#1}}}
+\newcommand{\figref}[1]{\hyperref[#1]{图~\ref*{#1}}}
+
+% -------------------- 基础版式 --------------------
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0pt}
+
+% 若需要统一图表文件夹，可直接使用 figures/ 下的文件
+\graphicspath{{figures/}}
+\newcommand{\paperfigure}[4][0.92]{%
+  \begin{figure}[!htbp]\centering
+  \includegraphics[width=#1\linewidth,height=0.34\textheight,keepaspectratio]{#2}
+  \caption{#3}\label{#4}
+  \end{figure}}
+\newcommand{\unitC}{\,{}^\circ\mathrm{C}}
+% 图4、图10横向放大；图6同时解除原来的高度限制。
+\newcommand{\largepaperfigure}[4][1.10]{%
+  \begin{figure}[!htbp]\centering
+  \makebox[\linewidth][c]{\includegraphics[width=#1\linewidth,height=0.55\textheight,keepaspectratio]{#2}}
+  \caption{#3}\label{#4}
+  \end{figure}}
+\setlength{\emergencystretch}{2em}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.75}
+\raggedbottom
+
+\begin{document}
+
+% 国赛电子版论文第一页直接从摘要开始。
+\input{sections/00_abstract}
+\clearpage
+
+\input{sections/01_problem_restatement}
+\input{sections/02_problem_analysis}
+\input{sections/03_model_assumptions}
+\input{sections/04_symbols}
+\input{sections/06_model_establishment_and_solution}
+\input{sections/07_model_evaluation}
+\clearpage
+\section*{AI工具使用说明}
+本参赛队在竞赛过程中使用了 AI 工具，主要用于数学模型与数值程序的辅助审查、代码审计及数值验证方案检查，详细使用情况见支撑材料。
+\input{sections/08_references}
+
+\end{document}

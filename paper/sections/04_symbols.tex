@@ -1,0 +1,29 @@
+\section{符号说明}
+本文以$C$表示药材干基含水率，即题目中的水分浓度。正文中的温度$T$以摄氏度表示，扩散系数经验式中的绝对温度统一写为$T+273.15$。主要符号及单位见\tabref{tab:symbols}。
+\begin{table}[!htbp]\centering\small
+\caption{主要符号及其含义与单位}\label{tab:symbols}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{0.98\textwidth}{@{}cLc@{}}
+\toprule
+符号 & 含义 & 单位\\\midrule
+$t$ & 自烘干开始计的时间 & $\mathrm{s}$\\
+$r,z$ & 径向坐标、以中截面为原点的轴向坐标 & $\mathrm{m}$\\
+$R(t),R_0$ & 当前半径、初始半径 & $\mathrm{m}$\\
+$L,H$ & 圆柱长度、半长（$H=L/2$） & $\mathrm{m}$\\
+$T,T_\infty$ & 药材温度、烘房温度 & $ {}^\circ\mathrm{C}$\\
+$C,C_\infty$ & 药材干基含水率、烘房水分浓度 & $\mathrm{kg/kg}$\\
+$\rho$ & 药材密度 & $\mathrm{kg/m^3}$\\
+$c_p$ & 药材比热容 & $\mathrm{J/(kg\cdot K)}$\\
+$k$ & 导热系数 & $\mathrm{W/(m\cdot K)}$\\
+$D$ & 有效水分扩散系数 & $\mathrm{m^2/s}$\\
+$h$ & 对流换热系数 & $\mathrm{W/(m^2\cdot K)}$\\
+$h_m$ & 对流传质系数 & $\mathrm{m/s}$\\
+$N_r,N_z$ & 径向、轴向网格区间数 & 1\\
+$\lambda$ & 网格拉伸指数 & 1\\
+$V_P,A_f,d_{PN}$ & 控制体体积、界面面积、相邻节点间距 & $\mathrm{m^3},\mathrm{m^2},\mathrm{m}$\\
+$\xi,s_R$ & 归一化径向坐标、半径缩放比例 & 1\\
+$m$ & 环境延拓所用末段观测点数 & 1\\
+$t_{\mathrm{dry}}$ & 首次达到全域干燥阈值的时刻 & $\mathrm{s}$或$\mathrm{h}$\\
+\bottomrule
+\end{tabularx}
+\end{table}

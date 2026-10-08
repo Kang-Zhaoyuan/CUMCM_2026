@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="D:/HIT/数模2026/eda_figures/three.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #FFFFFF; overflow: hidden; width: 2600px; height: 2600px; }
+    #container { width: 2600px; height: 2600px; }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <script>
+    const width = 2600;
+    const height = 2600;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xFFFFFF);
+
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+    camera.position.set(-1.4995, 2.6970, -12.9195);
+    const target = new THREE.Vector3(3.3000, 0.0000, 0.0000);
+    camera.lookAt(target);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(1);
+    renderer.setClearColor(0xFFFFFF, 1.0);
+    document.getElementById('container').appendChild(renderer.domElement);
+
+    const r_small_in = 2.10;
+    const r_small_out = 3.25;
+    const delta_r = 1.15;
+    const delta_z = 1.10;
+    const gap = 0.30;
+
+    const r_mother_in = r_small_out + gap; // 3.55
+    const r_mother_out = r_mother_in + delta_r; // 4.70
+
+    const r_large_in = r_mother_out + gap; // 5.00
+    const r_large_out = r_large_in + delta_r; // 6.15
+
+    const y_far = delta_z + gap; // 1.40
+    const y_near = -(delta_z + gap); // -1.40
+
+    function createRingSectorGeometry(rIn, rOut, h) {
+      const startAngle = 0.0;
+      const endAngle = (60.0 * Math.PI) / 180.0;
+
+      const shape = new THREE.Shape();
+      const segs = 64;
+
+      shape.absarc(0, 0, rOut, startAngle, endAngle, false);
+      shape.lineTo(rIn * Math.cos(endAngle), rIn * Math.sin(endAngle));
+      shape.absarc(0, 0, rIn, endAngle, startAngle, true);
+      shape.lineTo(rOut * Math.cos(startAngle), rOut * Math.sin(startAngle));
+
+      const extrudeSettings = {
+        depth: h,
+        bevelEnabled: false,
+        curveSegments: segs
+      };
+
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(0, -h / 2, 0);
+      return geo;
+    }
+
+    const whiteMaterial = new THREE.MeshBasicMaterial({
+      color: 0xFFFFFF,
+      polygonOffset: true,
+      polygonOffsetFactor: 1.0,
+      polygonOffsetUnits: 1.0
+    });
+
+    const blackTubeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const thinEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+
+    function createCylinderBetweenPoints(p1, p2, radius, mat = blackTubeMaterial) {
+      const dir = new THREE.Vector3().subVectors(p2, p1);
+      const len = dir.length();
+      if (len < 1e-4) return null;
+      const geom = new THREE.CylinderGeometry(radius, radius, len, 16, 1, false);
+      geom.translate(0, len / 2, 0);
+      geom.rotateX(Math.PI / 2);
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.copy(p1);
+      mesh.lookAt(p2);
+      return mesh;
+    }
+
+    function createLineBetweenPoints(p1, p2) {
+      const geom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      return new THREE.Line(geom, thinEdgeMaterial);
+    }
+
+    const ringSpecs = [
+      { name: 'mother', rIn: r_mother_in, rOut: r_mother_out, y: 0.0, isMother: true },
+      { name: 'small',  rIn: r_small_in,  rOut: r_small_out,  y: 0.0, isMother: false },
+      { name: 'large',  rIn: r_large_in,  rOut: r_large_out,  y: 0.0, isMother: false },
+      { name: 'far',    rIn: r_mother_in, rOut: r_mother_out, y: y_far, isMother: false },
+      { name: 'near',   rIn: r_mother_in, rOut: r_mother_out, y: y_near, isMother: false }
+    ];
+
+    ringSpecs.forEach(spec => {
+      const geo = createRingSectorGeometry(spec.rIn, spec.rOut, delta_z);
+      const mesh = new THREE.Mesh(geo, whiteMaterial);
+      mesh.position.y = spec.y;
+      scene.add(mesh);
+
+      const edgeGeo = new THREE.EdgesGeometry(geo, 15);
+
+      if (spec.isMother) {
+        const posAttr = edgeGeo.attributes.position;
+        const tubeR = 0.024;
+        for (let i = 0; i < posAttr.count; i += 2) {
+          const p1 = new THREE.Vector3(posAttr.getX(i), posAttr.getY(i) + spec.y, posAttr.getZ(i));
+          const p2 = new THREE.Vector3(posAttr.getX(i+1), posAttr.getY(i+1) + spec.y, posAttr.getZ(i+1));
+          const cyl = createCylinderBetweenPoints(p1, p2, tubeR);
+          if (cyl) scene.add(cyl);
+        }
+      } else {
+        const lineSegments = new THREE.LineSegments(edgeGeo, thinEdgeMaterial);
+        lineSegments.position.y = spec.y;
+        scene.add(lineSegments);
+      }
+    });
+
+    // Silhouettes
+    const th_large = 0.6080707029569035;
+    scene.add(createLineBetweenPoints(
+      new THREE.Vector3(r_large_out * Math.cos(th_large), -delta_z / 2, -r_large_out * Math.sin(th_large)),
+      new THREE.Vector3(r_large_out * Math.cos(th_large),  delta_z / 2, -r_large_out * Math.sin(th_large))
+    ));
+
+    const th_mother = 0.4852796167298652;
+    scene.add(createLineBetweenPoints(
+      new THREE.Vector3(r_mother_out * Math.cos(th_mother), y_far - delta_z / 2, -r_mother_out * Math.sin(th_mother)),
+      new THREE.Vector3(r_mother_out * Math.cos(th_mother), y_far + delta_z / 2, -r_mother_out * Math.sin(th_mother))
+    ));
+
+    const cyl_mother = createCylinderBetweenPoints(
+      new THREE.Vector3(r_mother_out * Math.cos(th_mother), -delta_z / 2, -r_mother_out * Math.sin(th_mother)),
+      new THREE.Vector3(r_mother_out * Math.cos(th_mother),  delta_z / 2, -r_mother_out * Math.sin(th_mother)),
+      0.024
+    );
+    if (cyl_mother) scene.add(cyl_mother);
+
+    scene.add(createLineBetweenPoints(
+      new THREE.Vector3(r_mother_out * Math.cos(th_mother), y_near - delta_z / 2, -r_mother_out * Math.sin(th_mother)),
+      new THREE.Vector3(r_mother_out * Math.cos(th_mother), y_near + delta_z / 2, -r_mother_out * Math.sin(th_mother))
+    ));
+
+    const th_small = 0.3681044723237481;
+    scene.add(createLineBetweenPoints(
+      new THREE.Vector3(r_small_out * Math.cos(th_small), -delta_z / 2, -r_small_out * Math.sin(th_small)),
+      new THREE.Vector3(r_small_out * Math.cos(th_small),  delta_z / 2, -r_small_out * Math.sin(th_small))
+    ));
+
+    // Standard Red Gradient Generator
+    function makeRedGradientTexture(alphaStart = 0.12, alphaEnd = 1.0, hexColor = '235, 15, 15') {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 16;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 256, 0);
+      grad.addColorStop(0.00, `rgba(${hexColor}, ${alphaStart})`);
+      grad.addColorStop(0.35, `rgba(${hexColor}, ${alphaStart + (alphaEnd - alphaStart) * 0.45})`);
+      grad.addColorStop(0.70, `rgba(${hexColor}, ${alphaStart + (alphaEnd - alphaStart) * 0.85})`);
+      grad.addColorStop(1.00, `rgba(${hexColor}, ${alphaEnd})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 16);
+      const tex = new THREE.CanvasTexture(c);
+      return tex;
+    }
+
+    const defaultRedTex = makeRedGradientTexture(0.12, 1.0, '235, 20, 20');
+
+    // Cut plane geometry basis
+    const th_cut = (60.0 * Math.PI) / 180.0;
+    const e_r = new THREE.Vector3(Math.cos(th_cut), 0, -Math.sin(th_cut));
+    const e_y = new THREE.Vector3(0, 1, 0);
+    const n_cam = new THREE.Vector3(-Math.sin(th_cut), 0, -Math.cos(th_cut)).normalize();
+
+    // Flared Arrow Mesh Builder (2D Ribbon or 3D Extruded)
+    function addFlaredArrow(pStart, pEnd, wTail, wNeck, wHead, headRatio, power, lift = 0.02, extrudeThick = 0, customTex = defaultRedTex) {
+      const dir = new THREE.Vector3().subVectors(pEnd, pStart);
+      const L = dir.length();
+      const u = dir.clone().normalize();
+      const v = new THREE.Vector3().crossVectors(n_cam, u).normalize();
+
+      const Lhead = L * headRatio;
+      const Lshaft = L - Lhead;
+      const segs = 36;
+
+      if (extrudeThick <= 0) {
+        // Pure 2D Ribbon on Cut Plane
+        const vertices = [];
+        const uvs = [];
+        const indices = [];
+
+        for (let i = 0; i <= segs; i++) {
+          const t = i / segs;
+          const x = t * Lshaft;
+          const w = (wNeck / 2) + ((wTail - wNeck) / 2) * Math.pow(1 - t, power);
+          const uVal = t * (Lshaft / L);
+
+          const pT = pStart.clone().addScaledVector(u, x).addScaledVector(v, w).addScaledVector(n_cam, lift);
+          const pB = pStart.clone().addScaledVector(u, x).addScaledVector(v, -w).addScaledVector(n_cam, lift);
+
+          vertices.push(pT.x, pT.y, pT.z);
+          uvs.push(uVal, 1.0);
+          vertices.push(pB.x, pB.y, pB.z);
+          uvs.push(uVal, 0.0);
+        }
+
+        for (let i = 0; i < segs; i++) {
+          const i0 = 2 * i;
+          const i1 = 2 * i + 1;
+          const i2 = 2 * (i + 1);
+          const i3 = 2 * (i + 1) + 1;
+          indices.push(i0, i1, i2);
+          indices.push(i2, i1, i3);
+        }
+
+        // Arrowhead
+        const baseIdx = vertices.length / 3;
+        const pHeadTop = pStart.clone().addScaledVector(u, Lshaft).addScaledVector(v, wHead / 2).addScaledVector(n_cam, lift);
+        const pHeadBot = pStart.clone().addScaledVector(u, Lshaft).addScaledVector(v, -wHead / 2).addScaledVector(n_cam, lift);
+        const pTip = pStart.clone().addScaledVector(u, L).addScaledVector(n_cam, lift);
+
+        vertices.push(pHeadTop.x, pHeadTop.y, pHeadTop.z);
+        uvs.push(Lshaft / L, 1.0);
+        vertices.push(pHeadBot.x, pHeadBot.y, pHeadBot.z);
+        uvs.push(Lshaft / L, 0.0);
+        vertices.push(pTip.x, pTip.y, pTip.z);
+        uvs.push(1.0, 0.5);
+
+        indices.push(baseIdx, baseIdx + 1, baseIdx + 2);
+
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geom.setIndex(indices);
+        geom.computeVertexNormals();
+
+        const mat = new THREE.MeshBasicMaterial({
+          map: customTex,
+          transparent: true,
+          side: THREE.DoubleSide,
+          depthTest: true
+        });
+        scene.add(new THREE.Mesh(geom, mat));
+      } else {
+        // 3D Extruded Solid Ribbon with thickness
+        const shape = new THREE.Shape();
+        shape.moveTo(0, wTail / 2);
+        for (let i = 1; i <= segs; i++) {
+          const t = i / segs;
+          const x = t * Lshaft;
+          const w = (wNeck / 2) + ((wTail - wNeck) / 2) * Math.pow(1 - t, power);
+          shape.lineTo(x, w);
+        }
+        shape.lineTo(Lshaft, wHead / 2);
+        shape.lineTo(L, 0);
+        shape.lineTo(Lshaft, -wHead / 2);
+        shape.lineTo(Lshaft, -wNeck / 2);
+        for (let i = segs - 1; i >= 0; i--) {
+          const t = i / segs;
+          const x = t * Lshaft;
+          const w = -((wNeck / 2) + ((wTail - wNeck) / 2) * Math.pow(1 - t, power));
+          shape.lineTo(x, w);
+        }
+        shape.closePath();
+
+        const extrudeSettings = {
+          depth: extrudeThick,
+          bevelEnabled: false
+        };
+        const geo3d = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        // Position and orient in 3D:
+        // By default, ExtrudeGeometry is in XY plane, depth along Z.
+        // We create a local group:
+        const group = new THREE.Group();
+        const matFront = new THREE.MeshBasicMaterial({ map: customTex, transparent: true, depthTest: true });
+        const matEdge = new THREE.MeshBasicMaterial({ color: 0xCC1111, depthTest: true });
+        const mesh = new THREE.Mesh(geo3d, [matFront, matEdge]);
+
+        // Place group at pStart + lift*n_cam
+        group.position.copy(pStart).addScaledVector(n_cam, lift);
+        // Local basis: X -> u, Y -> v, Z -> n_cam
+        const rotMat = new THREE.Matrix4().makeBasis(u, v, n_cam);
+        group.setRotationFromMatrix(rotMat);
+        group.add(mesh);
+        scene.add(group);
+      }
+    }
+
+    
+    const r_mid = (r_mother_in + r_mother_out) / 2.0;
+    const cos_c = Math.cos(th_cut);
+    const sin_c = Math.sin(th_cut);
+
+    // 1. Large -> Mother (Inflow, Large Flux)
+    addFlaredArrow(
+      new THREE.Vector3(5.35 * cos_c, 0.0, -5.35 * sin_c),
+      new THREE.Vector3(4.40 * cos_c, 0.0, -4.40 * sin_c),
+      0.28, 0.08, 0.20, 0.32, 2.5, 0.02, 0
+    );
+
+    // 2. Far -> Mother (Inflow, Large Flux)
+    addFlaredArrow(
+      new THREE.Vector3(r_mid * cos_c, 1.20, -r_mid * sin_c),
+      new THREE.Vector3(r_mid * cos_c, 0.25, -r_mid * sin_c),
+      0.28, 0.08, 0.20, 0.32, 2.5, 0.02, 0
+    );
+
+    // 3. Mother -> Small (Outflow, Diminished Flux)
+    addFlaredArrow(
+      new THREE.Vector3(3.70 * cos_c, 0.0, -3.70 * sin_c),
+      new THREE.Vector3(3.05 * cos_c, 0.0, -3.05 * sin_c),
+      0.16, 0.045, 0.13, 0.32, 2.5, 0.02, 0
+    );
+
+    // 4. Mother -> Near (Outflow, Diminished Flux)
+    addFlaredArrow(
+      new THREE.Vector3(r_mid * cos_c, -0.35, -r_mid * sin_c),
+      new THREE.Vector3(r_mid * cos_c, -1.00, -r_mid * sin_c),
+      0.16, 0.045, 0.13, 0.32, 2.5, 0.02, 0
+    );
+
+
+    renderer.render(scene, camera);
+  </script>
+</body>
+</html>

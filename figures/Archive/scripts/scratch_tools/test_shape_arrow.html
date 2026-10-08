@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="D:/HIT/数模2026/eda_figures/three.min.js"></script>
+  <style>
+    body { margin: 0; background: #FFFFFF; }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <script>
+    const width = 800, height = 600;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xFFFFFF);
+
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    document.getElementById('container').appendChild(renderer.domElement);
+
+    // Create 1D horizontal gradient texture (Standard pure red)
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 16;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 256, 0);
+    grad.addColorStop(0.0, 'rgba(255, 30, 30, 0.12)');
+    grad.addColorStop(0.3, 'rgba(255, 20, 20, 0.50)');
+    grad.addColorStop(0.7, 'rgba(240, 10, 10, 0.90)');
+    grad.addColorStop(1.0, 'rgba(230, 0, 0, 1.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 16);
+
+    const gradTex = new THREE.CanvasTexture(c);
+
+    function createFlaredArrowShape(L, Lhead, Wtail, Wneck, Whead, power = 2.5) {
+      const shape = new THREE.Shape();
+      const Lshaft = L - Lhead;
+      const segs = 32;
+
+      // Start at top corner of tail (0, Wtail/2)
+      shape.moveTo(0, Wtail / 2);
+
+      // Top curved edge to neck
+      for (let i = 1; i <= segs; i++) {
+        const t = i / segs;
+        const x = t * Lshaft;
+        const w = (Wneck / 2) + ((Wtail - Wneck) / 2) * Math.pow(1 - t, power);
+        shape.lineTo(x, w);
+      }
+
+      // Top wing of arrowhead
+      shape.lineTo(Lshaft, Whead / 2);
+
+      // Tip
+      shape.lineTo(L, 0);
+
+      // Bottom wing of arrowhead
+      shape.lineTo(Lshaft, -Whead / 2);
+
+      // Bottom neck
+      shape.lineTo(Lshaft, -Wneck / 2);
+
+      // Bottom curved edge back to tail
+      for (let i = segs - 1; i >= 0; i--) {
+        const t = i / segs;
+        const x = t * Lshaft;
+        const w = -((Wneck / 2) + ((Wtail - Wneck) / 2) * Math.pow(1 - t, power));
+        shape.lineTo(x, w);
+      }
+
+      // Close back to (0, Wtail/2)
+      shape.closePath();
+      return shape;
+    }
+
+    const shape = createFlaredArrowShape(3.0, 0.8, 1.2, 0.3, 0.9, 2.5);
+    const geo = new THREE.ShapeGeometry(shape);
+
+    const mat = new THREE.MeshBasicMaterial({
+      map: gradTex,
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(-1.5, 0, 0);
+    scene.add(mesh);
+
+    renderer.render(scene, camera);
+  </script>
+</body>
+</html>

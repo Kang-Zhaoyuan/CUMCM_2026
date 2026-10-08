@@ -1,0 +1,71 @@
+import subprocess, os, shutil
+from PIL import Image
+
+html_two = """<!DOCTYPE html>
+<html>
+<head>
+<script src="three.min.js"></script>
+<style>* { margin: 0; padding: 0; } body { background: #fff; overflow: hidden; width: 1000px; height: 1000px; }</style>
+</head>
+<body>
+<div id="c" style="width:1000px;height:1000px;"></div>
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xFFFFFF);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+camera.position.set(-0.01, 1.86, -8.91);
+camera.lookAt(3.30, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(1000, 1000);
+renderer.setClearColor(0xFFFFFF, 1.0);
+document.getElementById('c').appendChild(renderer.domElement);
+
+function createRing(rIn, rOut, h, sweepDeg) {
+  const sweepRad = (sweepDeg * Math.PI) / 180.0;
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, rOut, -sweepRad/2, sweepRad/2, false);
+  shape.lineTo(rIn * Math.cos(sweepRad/2), rIn * Math.sin(sweepRad/2));
+  shape.absarc(0, 0, rIn, sweepRad/2, -sweepRad/2, true);
+  shape.lineTo(rOut * Math.cos(-sweepRad/2), rOut * Math.sin(-sweepRad/2));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 64 });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -h / 2, 0);
+  return geo;
+}
+
+const whiteMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+
+// 1. Mother Ring
+const geoM = createRing(3.55, 4.70, 1.10, 120);
+const meshM = new THREE.Mesh(geoM, whiteMat);
+meshM.position.y = 0.0;
+scene.add(meshM);
+const edgesM = new THREE.LineSegments(new THREE.EdgesGeometry(geoM, 15), edgeMat);
+edgesM.position.y = 0.0;
+scene.add(edgesM);
+
+// 2. Near Ring
+const geoN = createRing(3.55, 4.70, 1.10, 120);
+const meshN = new THREE.Mesh(geoN, whiteMat);
+meshN.position.y = -1.40;
+scene.add(meshN);
+const edgesN = new THREE.LineSegments(new THREE.EdgesGeometry(geoN, 15), edgeMat);
+edgesN.position.y = -1.40;
+scene.add(edgesN);
+
+renderer.render(scene, camera);
+</script>
+</body>
+</html>"""
+
+html_path = r'C:\Users\kqdx\.gemini\antigravity\brain\984f8f9b-1caf-4e5e-a827-7c48f241b73b\scratch\test_two.html'
+with open(html_path, 'w', encoding='utf-8') as f:
+    f.write(html_two)
+
+edge_exe = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+raw_png = r'C:\Users\kqdx\.gemini\antigravity\brain\984f8f9b-1caf-4e5e-a827-7c48f241b73b\scratch\two_rings.png'
+cmd = [edge_exe, '--headless', f'--screenshot={raw_png}', '--window-size=1000,1000', f'file:///{html_path.replace(os.sep, "/")}']
+subprocess.run(cmd, check=True)
+print('Two rings rendered.')

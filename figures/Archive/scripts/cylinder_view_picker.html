@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 剖切圆柱体交互式视角拾取器</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    input[type=range] {
+      accent-color: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col p-3 md:p-5">
+
+  <!-- Header -->
+  <header class="bg-white border border-slate-200 rounded-xl px-5 py-3.5 mb-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2">
+        <span class="inline-block w-3 h-3 rounded-full bg-slate-900"></span>
+        7卦限立体圆柱体 · 交互式视角拾取器 (Pure Line-Art Wireframe)
+      </h1>
+      <p class="text-xs text-slate-500 mt-0.5">
+        纯线稿边缘模式（无涂色填色）| 在空间中任意拖动旋转、滚轮缩放，挑选满意视角后一键复制参数
+      </p>
+    </div>
+    
+    <!-- Big Action Button -->
+    <div class="flex items-center gap-2.5">
+      <button id="btn-save-view" class="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs md:text-sm font-semibold rounded-lg shadow transition-all duration-150">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+        </svg>
+        <span>💾 保存并复制当前视角</span>
+      </button>
+      <button id="btn-reset" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs md:text-sm font-medium rounded-lg transition-colors" title="重置为默认视角">
+        🔄 重置
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4">
+    
+    <!-- 3D Canvas Area (Left / Center, 8 cols) -->
+    <div class="lg:col-span-8 bg-white border border-slate-200 rounded-xl shadow-sm relative overflow-hidden flex flex-col min-h-[500px]">
+      
+      <!-- Canvas Status Overlay (Top Left) -->
+      <div class="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2 pointer-events-none">
+        <div class="bg-white/90 backdrop-blur border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-700 shadow-sm flex items-center gap-2.5">
+          <span>仰角 <b id="disp-elev" class="text-slate-900 font-bold">24°</b></span>
+          <span class="text-slate-300">|</span>
+          <span>方位角 <b id="disp-azim" class="text-slate-900 font-bold">-58°</b></span>
+          <span class="text-slate-300">|</span>
+          <span>滚转 <b id="disp-roll" class="text-slate-900 font-bold">0°</b></span>
+          <span class="text-slate-300">|</span>
+          <span>缩放 <b id="disp-zoom" class="text-slate-900 font-bold">1.0x</b></span>
+        </div>
+      </div>
+
+      <!-- Mouse Help Floating Hint (Bottom Left) -->
+      <div class="absolute bottom-3 left-3 z-10 pointer-events-none">
+        <div class="bg-slate-900/80 backdrop-blur text-white text-[11px] px-3 py-1.5 rounded-lg shadow flex items-center gap-3">
+          <span>🖱️ <b>左键拖拽</b>：空间旋转</span>
+          <span>📜 <b>滚轮</b>：缩放</span>
+          <span>🖱️ <b>右键拖拽</b>：平移</span>
+          <span>⌨️ <b>Shift+拖拽</b>：滚转</span>
+        </div>
+      </div>
+
+      <!-- Canvas -->
+      <canvas id="viewport" class="w-full flex-1 cursor-grab active:cursor-grabbing block"></canvas>
+    </div>
+
+    <!-- Controls Panel (Right, 4 cols) -->
+    <div class="lg:col-span-4 flex flex-col gap-4">
+      
+      <!-- 1. Preset Angles Card -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+          <span>🎯 常用推荐视角预设</span>
+        </h2>
+        <div class="grid grid-cols-2 gap-2">
+          <button class="preset-btn px-2.5 py-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-colors text-left" data-elev="24" data-azim="-58" data-roll="0">
+            📌 当前默认视角 (24°, -58°)
+          </button>
+          <button class="preset-btn px-2.5 py-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-colors text-left" data-elev="32" data-azim="-42" data-roll="0">
+            📐 剖切三面平视 (32°, -42°)
+          </button>
+          <button class="preset-btn px-2.5 py-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-colors text-left" data-elev="48" data-azim="-55" data-roll="0">
+            🦅 俯瞰剖台全景 (48°, -55°)
+          </button>
+          <button class="preset-btn px-2.5 py-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-colors text-left" data-elev="16" data-azim="-75" data-roll="0">
+            ↔️ 横向细长侧影 (16°, -75°)
+          </button>
+          <button class="preset-btn px-2.5 py-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-colors text-left" data-elev="20" data-azim="-25" data-roll="0">
+            🔍 中截面正斜视 (20°, -25°)
+          </button>
+          <button class="preset-btn px-2.5 py-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-colors text-left" data-elev="12" data-azim="-120" data-roll="0">
+            🪵 端面3/4斜视 (12°, -120°)
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Precise Numerical Sliders -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col gap-3.5">
+        <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+          <span>🎚️ 视角与形态精细调节</span>
+        </h2>
+
+        <!-- Elevation -->
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <span>仰角 (Elev)</span>
+            <span id="label-elev" class="font-mono text-slate-900">24°</span>
+          </div>
+          <input type="range" id="slider-elev" min="-85" max="85" step="1" value="24" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- Azimuth -->
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <span>方位角 (Azim)</span>
+            <span id="label-azim" class="font-mono text-slate-900">-58°</span>
+          </div>
+          <input type="range" id="slider-azim" min="-180" max="180" step="1" value="-58" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- Roll -->
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <span>滚转角 (Roll)</span>
+            <span id="label-roll" class="font-mono text-slate-900">0°</span>
+          </div>
+          <input type="range" id="slider-roll" min="-90" max="90" step="1" value="0" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- Zoom -->
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <span>缩放比例 (Zoom)</span>
+            <span id="label-zoom" class="font-mono text-slate-900">1.00x</span>
+          </div>
+          <input type="range" id="slider-zoom" min="0.4" max="2.5" step="0.05" value="1.0" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- Aspect Ratio (Slenderness) -->
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <span>长径比 (半长 L/2)</span>
+            <span id="label-ratio" class="font-mono text-slate-900">3.60</span>
+          </div>
+          <input type="range" id="slider-ratio" min="2.0" max="6.25" step="0.2" value="3.6" class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+        </div>
+      </div>
+
+      <!-- 3. Visual Layers Toggle -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+          <span>👁️ 线稿显示层控制</span>
+        </h2>
+        <div class="space-y-2 text-xs text-slate-700 font-medium">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="chk-edges" checked class="rounded border-slate-300 text-slate-900 focus:ring-0">
+            <span>主几何边界外轮廓 (Primary Silhouette & Edges)</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="chk-layers" checked class="rounded border-slate-300 text-slate-900 focus:ring-0">
+            <span>内部同心梯度分层线 (Concentric Shells)</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="chk-ribs" checked class="rounded border-slate-300 text-slate-900 focus:ring-0">
+            <span>筒身周向/轴向网格线 (Cylinder Wireframe Mesh)</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="chk-axes" checked class="rounded border-slate-300 text-slate-900 focus:ring-0">
+            <span>空间坐标轴预览 (Axes: z, r, θ & Origin)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 4. Save View Output Box -->
+      <div class="bg-slate-900 text-slate-100 border border-slate-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-300">📋 当前视角参数 (用于反馈给助手)</span>
+          <span id="copy-badge" class="hidden text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded font-mono">已复制！</span>
+        </div>
+        <textarea id="output-box" readonly class="w-full bg-slate-950 text-slate-200 font-mono text-xs p-2.5 rounded-lg border border-slate-800 resize-none h-24 focus:outline-none select-all"></textarea>
+        <p class="text-[11px] text-slate-400">
+          💡 调整至满意的角度后，点击右上角<b>“保存并复制当前视角”</b>，然后直接将参数粘贴发给我即可！
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-6 right-6 bg-emerald-600 text-white text-xs md:text-sm font-medium px-4 py-2.5 rounded-xl shadow-xl transform translate-y-[-100px] opacity-0 transition-all duration-300 z-50 flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+    </svg>
+    <span id="toast-msg">视角参数已成功保存并复制到剪贴板！</span>
+  </div>
+
+  <script>
+    // State
+    const state = {
+      elev: 24.0,
+      azim: -58.0,
+      roll: 0.0,
+      zoom: 1.0,
+      panX: 0,
+      panY: 0,
+      L_half: 3.6,
+      R: 1.0,
+      showEdges: true,
+      showLayers: true,
+      showRibs: true,
+      showAxes: true
+    };
+
+    const canvas = document.getElementById('viewport');
+    const ctx = canvas.getContext('2d');
+
+    // Radii of concentric layers
+    const layerRadii = [0.28, 0.55, 0.80];
+
+    // Colors (Strict scientific line-art palette)
+    const C_EDGE = '#0f172a';       // Deep slate black
+    const C_LAYER = '#64748b';      // Slate gray
+    const C_RIB = '#cbd5e1';        // Light wireframe gray
+    const C_AXIS_Z = '#0f172a';     // Z-axis
+    const C_AXIS_R = '#0f172a';     // R-axis
+    const C_ORIGIN = '#d63031';     // Subtle red dot for origin
+
+    // Resize Handler
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+      render();
+    }
+
+    // 3D Projection Math (Matching Matplotlib exactly)
+    // Cylinder is aligned along X-axis: X in [-L_half, L_half]
+    // Transverse Y = r * cos(theta), Z = r * sin(theta)
+    function project(p) {
+      const elev = state.elev * Math.PI / 180;
+      const azim = state.azim * Math.PI / 180;
+      const roll = state.roll * Math.PI / 180;
+
+      // Eye position vector
+      const ce = Math.cos(elev), se = Math.sin(elev);
+      const ca = Math.cos(azim), sa = Math.sin(azim);
+
+      // Forward direction towards origin
+      const fx = -ce * ca;
+      const fy = -ce * sa;
+      const fz = -se;
+
+      // Up vector
+      let ux = 0, uy = 0, uz = 1;
+      if (Math.abs(fz) > 0.999) {
+        ux = 0; uy = 1; uz = 0;
+      }
+
+      // Right vector = forward x up
+      let rx = fy * uz - fz * uy;
+      let ry = fz * ux - fx * uz;
+      let rz = fx * uy - fy * ux;
+      const rlen = Math.sqrt(rx*rx + ry*ry + rz*rz) || 1;
+      rx /= rlen; ry /= rlen; rz /= rlen;
+
+      // Camera Up = right x forward
+      let upx = ry * fz - rz * fy;
+      let upy = rz * fx - rx * fz;
+      let upz = rx * fy - ry * fx;
+
+      // Apply roll if any
+      if (roll !== 0) {
+        const cr = Math.cos(roll), sr = Math.sin(roll);
+        const nrx = rx * cr - upx * sr;
+        const nry = ry * cr - upy * sr;
+        const nrz = rz * cr - upz * sr;
+        const nupx = rx * sr + upx * cr;
+        const nupy = ry * sr + upy * cr;
+        const nupz = rz * sr + upz * cr;
+        rx = nrx; ry = nry; rz = nrz;
+        upx = nupx; upy = nupy; upz = nupz;
+      }
+
+      // Project point P = [x, y, z]
+      const px = p[0], py = p[1], pz = p[2];
+      const camX = px * rx + py * ry + pz * rz;
+      const camY = px * upx + py * upy + pz * upz;
+      const depth = px * fx + py * fy + pz * fz;
+
+      const rect = canvas.getBoundingClientRect();
+      const baseScale = Math.min(rect.width, rect.height) / (state.L_half * 1.6 + 2.0);
+      const scale = baseScale * state.zoom;
+
+      const sx = rect.width / 2 + camX * scale + state.panX;
+      const sy = rect.height / 2 - camY * scale + state.panY;
+
+      return { x: sx, y: sy, depth: depth };
+    }
+
+    // Draw 3D Line Segment
+    function draw3DLine(p1, p2, color, lw, dash = []) {
+      const sp1 = project(p1);
+      const sp2 = project(p2);
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash(dash);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = color;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.moveTo(sp1.x, sp1.y);
+      ctx.lineTo(sp2.x, sp2.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw 3D Arc
+    function draw3DArc(xCenter, radius, startAngle, endAngle, numSteps, color, lw, dash = []) {
+      const pts = [];
+      const delta = (endAngle - startAngle) / numSteps;
+      for (let i = 0; i <= numSteps; i++) {
+        const th = startAngle + i * delta;
+        pts.push([xCenter, radius * Math.cos(th), radius * Math.sin(th)]);
+      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash(dash);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = color;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      const sp0 = project(pts[0]);
+      ctx.moveTo(sp0.x, sp0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const sp = project(pts[i]);
+        ctx.lineTo(sp.x, sp.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Calculate Silhouette Generator Angles for Cylinder along X
+    function getSilhouetteAngles() {
+      const elev = state.elev * Math.PI / 180;
+      const azim = state.azim * Math.PI / 180;
+      const ce = Math.cos(elev), se = Math.sin(elev);
+      const ca = Math.cos(azim), sa = Math.sin(azim);
+      
+      // View direction vector from camera to origin: d
+      const dy = -ce * sa;
+      const dz = -se;
+
+      // Normal n = (0, cos(th), sin(th)). n . d = cos(th)*dy + sin(th)*dz = 0
+      const th1 = Math.atan2(dy, -dz);
+      const th2 = th1 + Math.PI;
+
+      const norm = (th) => ((th % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      return [norm(th1), norm(th2)];
+    }
+
+    // Main Render Routine
+    function render() {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const R = state.R;
+      const Lh = state.L_half;
+
+      // -------------------------------------------------------------
+      // 1. Circumferential Ribs & Meridians (Faint Mesh Wireframe)
+      // -------------------------------------------------------------
+      if (state.showRibs) {
+        // Circumferential rings along cylinder
+        const ringStations = [-0.75 * Lh, -0.5 * Lh, -0.25 * Lh, 0.25 * Lh, 0.5 * Lh, 0.75 * Lh];
+        ringStations.forEach(xPos => {
+          if (xPos < 0) {
+            draw3DArc(xPos, R, 0, 2 * Math.PI, 48, C_RIB, 0.75, [3, 3]);
+          } else {
+            // Right half: only remaining 3 octants (pi/2 to 2*pi)
+            draw3DArc(xPos, R, Math.PI / 2, 2 * Math.PI, 36, C_RIB, 0.75, [3, 3]);
+          }
+        });
+
+        // Longitudinal meridians along outer surface
+        const meridianAngles = [Math.PI, 5 * Math.PI / 4, 3 * Math.PI / 2, 7 * Math.PI / 4];
+        meridianAngles.forEach(th => {
+          const y = R * Math.cos(th);
+          const z = R * Math.sin(th);
+          draw3DLine([-Lh, y, z], [Lh, y, z], C_RIB, 0.7, [3, 3]);
+        });
+      }
+
+      // -------------------------------------------------------------
+      // 2. Concentric Gradient Layers (Internal Radial Shells)
+      // -------------------------------------------------------------
+      if (state.showLayers) {
+        layerRadii.forEach(r => {
+          // A. Midplane z = 0 (Quarter-arc: 0 to pi/2)
+          draw3DArc(0, r, 0, Math.PI / 2, 20, C_LAYER, 1.1);
+
+          // B. Horizontal shelf: along X from 0 to Lh at (r, 0)
+          draw3DLine([0, r, 0], [Lh, r, 0], C_LAYER, 1.0, [4, 3]);
+
+          // C. Vertical wall: along X from 0 to Lh at (0, r)
+          draw3DLine([0, 0, r], [Lh, 0, r], C_LAYER, 1.0, [4, 3]);
+
+          // D. Right end cap: 3/4 circle (pi/2 to 2*pi)
+          draw3DArc(Lh, r, Math.PI / 2, 2 * Math.PI, 36, C_LAYER, 1.0);
+
+          // E. Left end cap: full circle
+          draw3DArc(-Lh, r, 0, 2 * Math.PI, 40, C_LAYER, 0.9, [3, 3]);
+        });
+      }
+
+      // -------------------------------------------------------------
+      // 3. Primary Sharp Edges & Silhouette Outlines
+      // -------------------------------------------------------------
+      if (state.showEdges) {
+        // [A] Central Axis line inside cut: (0,0,0) to (Lh, 0, 0)
+        draw3DLine([0, 0, 0], [Lh, 0, 0], C_EDGE, 2.4);
+
+        // [B] Cut faces radial edges at X = 0 (Midplane):
+        // Horizontal radial edge along +Y (theta = 0)
+        draw3DLine([0, 0, 0], [0, R, 0], C_EDGE, 2.2);
+        // Vertical radial edge along +Z (theta = pi/2)
+        draw3DLine([0, 0, 0], [0, 0, R], C_EDGE, 2.2);
+        // Outer arc of the quarter cut at X = 0: (0 to pi/2)
+        draw3DArc(0, R, 0, Math.PI / 2, 28, C_EDGE, 2.2);
+
+        // [C] Cut longitudinal outer edges along cylinder body:
+        // Edge along shelf: from (0, R, 0) to (Lh, R, 0)
+        draw3DLine([0, R, 0], [Lh, R, 0], C_EDGE, 2.2);
+        // Edge along wall: from (0, 0, R) to (Lh, 0, R)
+        draw3DLine([0, 0, R], [Lh, 0, R], C_EDGE, 2.2);
+
+        // [D] Right End Cap at X = Lh:
+        // Radial edge 1
+        draw3DLine([Lh, 0, 0], [Lh, R, 0], C_EDGE, 2.0);
+        // Radial edge 2
+        draw3DLine([Lh, 0, 0], [Lh, 0, R], C_EDGE, 2.0);
+        // Outer 3/4 circle arc (pi/2 to 2*pi)
+        draw3DArc(Lh, R, Math.PI / 2, 2 * Math.PI, 48, C_EDGE, 2.2);
+
+        // [E] Left End Cap at X = -Lh:
+        // Optical occlusion: Inner arc is dashed, outer arc is solid
+        const [sth1, sth2] = getSilhouetteAngles();
+        const minTh = Math.min(sth1, sth2);
+        const maxTh = Math.max(sth1, sth2);
+        // Inner arc (facing cylinder body) -> Dashed
+        draw3DArc(-Lh, R, minTh, maxTh, 36, C_EDGE, 1.8, [4, 3]);
+        // Outer arc (boundary silhouette) -> Solid
+        draw3DArc(-Lh, R, maxTh, minTh + 2 * Math.PI, 36, C_EDGE, 2.2);
+
+        // [F] Outer Silhouette Generator Lines (dynamic based on view angle):
+        const [th1, th2] = getSilhouetteAngles();
+        [th1, th2].forEach(th => {
+          const y = R * Math.cos(th);
+          const z = R * Math.sin(th);
+
+          // Left half silhouette line: always exists
+          draw3DLine([-Lh, y, z], [0, y, z], C_EDGE, 2.0);
+
+          // Right half silhouette line: exists only if th is in retained 3 octants (pi/2 to 2*pi)
+          // In standard [0, 2pi), pi/2 is ~1.5708
+          if (th >= Math.PI / 2 && th <= 2 * Math.PI) {
+            draw3DLine([0, y, z], [Lh, y, z], C_EDGE, 2.0);
+          }
+        });
+      }
+
+      // -------------------------------------------------------------
+      // 4. Coordinate Axes & Origin Preview
+      // -------------------------------------------------------------
+      if (state.showAxes) {
+        // Origin O(0,0,0)
+        const spO = project([0, 0, 0]);
+        ctx.save();
+        ctx.fillStyle = C_ORIGIN;
+        ctx.beginPath();
+        ctx.arc(spO.x, spO.y, 4.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.font = 'bold 12px serif';
+        ctx.fillStyle = C_EDGE;
+        ctx.fillText('O (0,0,0)', spO.x - 22, spO.y + 18);
+
+        // +z axis arrow (along cylinder axial X)
+        const zEnd = [Lh * 1.18, 0, 0];
+        drawArrow3D([0, 0, 0], zEnd, C_AXIS_Z, 2.0, '+z (轴向)');
+
+        // +r axis arrow (along radial Y)
+        const rEnd = [0, R * 1.35, 0];
+        drawArrow3D([0, 0, 0], rEnd, C_AXIS_R, 2.0, '+r (径向)');
+
+        // Vertical axis (along +Z)
+        const yEnd = [0, 0, R * 1.35];
+        drawArrow3D([0, 0, 0], yEnd, '#475569', 1.5, '+y (周向法向)');
+
+        // Theta Arc
+        draw3DArc(0, 0.45 * R, 0.1, 1.45, 15, '#b91c1c', 1.6);
+        const spTh = project([0, 0.45 * R * Math.cos(0.8), 0.45 * R * Math.sin(0.8)]);
+        ctx.fillStyle = '#b91c1c';
+        ctx.font = 'italic bold 12px serif';
+        ctx.fillText('θ', spTh.x + 8, spTh.y - 4);
+        ctx.restore();
+      }
+
+      // Update UI displays
+      updateDisplays();
+    }
+
+    // 3D Arrow Helper
+    function drawArrow3D(pStart, pEnd, color, lw, label) {
+      const sp1 = project(pStart);
+      const sp2 = project(pEnd);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = lw;
+
+      // Shaft
+      ctx.beginPath();
+      ctx.moveTo(sp1.x, sp1.y);
+      ctx.lineTo(sp2.x, sp2.y);
+      ctx.stroke();
+
+      // Arrow head in 2D
+      const angle = Math.atan2(sp2.y - sp1.y, sp2.x - sp1.x);
+      const headLen = 9;
+      ctx.beginPath();
+      ctx.moveTo(sp2.x, sp2.y);
+      ctx.lineTo(sp2.x - headLen * Math.cos(angle - Math.PI / 6), sp2.y - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(sp2.x - headLen * Math.cos(angle + Math.PI / 6), sp2.y - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+
+      if (label) {
+        ctx.font = 'italic bold 11px sans-serif';
+        ctx.fillText(label, sp2.x + 8, sp2.y + 4);
+      }
+      ctx.restore();
+    }
+
+    // Update Numerical Displays & Output Text
+    function updateDisplays() {
+      const eStr = state.elev.toFixed(1) + '°';
+      const aStr = state.azim.toFixed(1) + '°';
+      const rStr = state.roll.toFixed(1) + '°';
+      const zStr = state.zoom.toFixed(2) + 'x';
+      const lStr = state.L_half.toFixed(2);
+
+      document.getElementById('disp-elev').innerText = eStr;
+      document.getElementById('disp-azim').innerText = aStr;
+      document.getElementById('disp-roll').innerText = rStr;
+      document.getElementById('disp-zoom').innerText = zStr;
+
+      document.getElementById('label-elev').innerText = eStr;
+      document.getElementById('label-azim').innerText = aStr;
+      document.getElementById('label-roll').innerText = rStr;
+      document.getElementById('label-zoom').innerText = zStr;
+      document.getElementById('label-ratio').innerText = lStr;
+
+      document.getElementById('slider-elev').value = state.elev;
+      document.getElementById('slider-azim').value = state.azim;
+      document.getElementById('slider-roll').value = state.roll;
+      document.getElementById('slider-zoom').value = state.zoom;
+      document.getElementById('slider-ratio').value = state.L_half;
+
+      // Pre-format output snippet
+      const outputSnippet = 
+`【已选定视角参数】
+elev = ${state.elev.toFixed(1)}
+azim = ${state.azim.toFixed(1)}
+roll = ${state.roll.toFixed(1)}
+zoom = ${state.zoom.toFixed(2)}
+aspect_ratio = ${state.L_half.toFixed(2)}
+
+# Matplotlib 代码冻结调用：
+ax.view_init(elev=${state.elev.toFixed(1)}, azim=${state.azim.toFixed(1)}, roll=${state.roll.toFixed(1)})`;
+
+      document.getElementById('output-box').value = outputSnippet;
+    }
+
+    // -------------------------------------------------------------
+    // Mouse & Touch Interactivity
+    // -------------------------------------------------------------
+    let isDragging = false;
+    let dragMode = 'rotate'; // 'rotate', 'pan', 'roll'
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+
+    canvas.addEventListener('mousedown', e => {
+      isDragging = true;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+
+      if (e.button === 2) {
+        // Right click -> Pan
+        dragMode = 'pan';
+      } else if (e.shiftKey) {
+        // Shift + Left click -> Roll
+        dragMode = 'roll';
+      } else {
+        // Left click -> Orbit (elev / azim)
+        dragMode = 'rotate';
+      }
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      const dx = e.clientX - lastMouseX;
+      const dy = e.clientY - lastMouseY;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+
+      if (dragMode === 'rotate') {
+        state.azim = (state.azim + dx * 0.5);
+        if (state.azim > 180) state.azim -= 360;
+        if (state.azim < -180) state.azim += 360;
+
+        state.elev = Math.max(-85, Math.min(85, state.elev - dy * 0.5));
+      } else if (dragMode === 'roll') {
+        state.roll = Math.max(-90, Math.min(90, state.roll + dx * 0.5));
+      } else if (dragMode === 'pan') {
+        state.panX += dx;
+        state.panY += dy;
+      }
+      render();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Wheel Zoom
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 0.93 : 1.07;
+      state.zoom = Math.max(0.3, Math.min(3.5, state.zoom * zoomFactor));
+      render();
+    }, { passive: false });
+
+    // Double click to reset pan & roll
+    canvas.addEventListener('dblclick', () => {
+      state.panX = 0;
+      state.panY = 0;
+      state.roll = 0;
+      state.zoom = 1.0;
+      render();
+    });
+
+    // Preset Buttons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.elev = parseFloat(btn.dataset.elev);
+        state.azim = parseFloat(btn.dataset.azim);
+        state.roll = parseFloat(btn.dataset.roll || 0);
+        state.panX = 0;
+        state.panY = 0;
+        render();
+      });
+    });
+
+    // Slider Listeners
+    document.getElementById('slider-elev').addEventListener('input', e => {
+      state.elev = parseFloat(e.target.value);
+      render();
+    });
+    document.getElementById('slider-azim').addEventListener('input', e => {
+      state.azim = parseFloat(e.target.value);
+      render();
+    });
+    document.getElementById('slider-roll').addEventListener('input', e => {
+      state.roll = parseFloat(e.target.value);
+      render();
+    });
+    document.getElementById('slider-zoom').addEventListener('input', e => {
+      state.zoom = parseFloat(e.target.value);
+      render();
+    });
+    document.getElementById('slider-ratio').addEventListener('input', e => {
+      state.L_half = parseFloat(e.target.value);
+      render();
+    });
+
+    // Checkbox Listeners
+    document.getElementById('chk-edges').addEventListener('change', e => {
+      state.showEdges = e.target.checked;
+      render();
+    });
+    document.getElementById('chk-layers').addEventListener('change', e => {
+      state.showLayers = e.target.checked;
+      render();
+    });
+    document.getElementById('chk-ribs').addEventListener('change', e => {
+      state.showRibs = e.target.checked;
+      render();
+    });
+    document.getElementById('chk-axes').addEventListener('change', e => {
+      state.showAxes = e.target.checked;
+      render();
+    });
+
+    // Reset Button
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      state.elev = 24.0;
+      state.azim = -58.0;
+      state.roll = 0.0;
+      state.zoom = 1.0;
+      state.panX = 0;
+      state.panY = 0;
+      state.L_half = 3.6;
+      render();
+    });
+
+    // Save & Copy View Button
+    const btnSave = document.getElementById('btn-save-view');
+    const toast = document.getElementById('toast');
+    const copyBadge = document.getElementById('copy-badge');
+
+    btnSave.addEventListener('click', () => {
+      const textToCopy = document.getElementById('output-box').value;
+      
+      // Clipboard copy
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        showToast('视角参数已复制到剪贴板！可以直接粘贴回复');
+      }).catch(() => {
+        // Fallback
+        const textarea = document.getElementById('output-box');
+        textarea.select();
+        document.execCommand('copy');
+        showToast('视角参数已复制到剪贴板！');
+      });
+
+      copyBadge.classList.remove('hidden');
+      setTimeout(() => copyBadge.classList.add('hidden'), 3000);
+    });
+
+    function showToast(msg) {
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.remove('translate-y-[-100px]', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.add('translate-y-[-100px]', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 2500);
+    }
+
+    // Init
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('DOMContentLoaded', resizeCanvas);
+    setTimeout(resizeCanvas, 50);
+  </script>
+</body>
+</html>

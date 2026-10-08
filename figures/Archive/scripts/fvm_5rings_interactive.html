@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FVM 五环控制体三维交互观察系统</title>
+  <!-- Local Three.js with CDN fallback -->
+  <script src="three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+  <script src="OrbitControls.js"></script>
+  <script>
+    if (typeof THREE.OrbitControls === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>');
+    }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: #121820;
+      color: #E2E8F0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    /* Controls Panel */
+    .panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 380px;
+      max-height: calc(100vh - 40px);
+      background: rgba(22, 30, 42, 0.88);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 22px;
+      z-index: 10;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+      overflow-y: auto;
+    }
+    .panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    .panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #38BDF8;
+      margin-top: 14px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 4px;
+    }
+    .control-group {
+      margin-bottom: 14px;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #CBD5E1;
+    }
+    .control-label span.value {
+      font-weight: 700;
+      color: #38BDF8;
+      font-family: Consolas, monospace;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #38BDF8;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+      transition: transform 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    button {
+      flex: 1;
+      padding: 9px 12px;
+      background: #1E293B;
+      color: #E2E8F0;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #334155;
+      border-color: #38BDF8;
+      color: #FFFFFF;
+    }
+    button.primary {
+      background: linear-gradient(135deg, #2563EB, #0284C7);
+      border: none;
+      color: #FFFFFF;
+      font-weight: 700;
+      padding: 12px;
+      font-size: 13px;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+    }
+    button.primary:hover {
+      background: linear-gradient(135deg, #1D4ED8, #0369A1);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(2, 132, 199, 0.5);
+    }
+    /* Legend / Status */
+    .legend-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 11.5px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 6px;
+    }
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    /* Info Box */
+    .info-box {
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      font-size: 11.5px;
+      line-height: 1.6;
+      color: #94A3B8;
+      font-family: Consolas, monospace;
+    }
+    .info-box strong {
+      color: #F1F5F9;
+    }
+    /* Notification Toast */
+    #toast {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #10B981;
+      color: #FFFFFF;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 13.5px;
+      font-weight: 700;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.45);
+      z-index: 100;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events: none;
+    }
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    /* Axis Indicator */
+    .axis-hint {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(22, 30, 42, 0.8);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #94A3B8;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <!-- Parameter Adjustment Panel -->
+  <div class="panel">
+    <h1>📐 FVM 五环控制体交互观察</h1>
+    <p class="subtitle">拖拽左键旋转视角，右键平移，滚轮缩放。实时调整几何尺寸与剖切角度。</p>
+
+    <div class="section-title">1. 四大核心调节参数</div>
+
+    <!-- Parameter (a): Small Ring Inner Radius -->
+    <div class="control-group">
+      <div class="control-label">
+        <span>(a) 小环内径 <i>r</i><sub>in</sub></span>
+        <span class="value" id="val-r-in">1.20</span>
+      </div>
+      <input type="range" id="param-r-in" min="0.2" max="4.0" step="0.05" value="1.20">
+    </div>
+
+    <!-- Parameter (b): Small Ring Outer Radius -->
+    <div class="control-group">
+      <div class="control-label">
+        <span>(b) 小环外径 <i>r</i><sub>out</sub></span>
+        <span class="value" id="val-r-out">2.20</span>
+      </div>
+      <input type="range" id="param-r-out" min="0.5" max="6.0" step="0.05" value="2.20">
+    </div>
+
+    <!-- Parameter (c): Ring Gap Distance -->
+    <div class="control-group">
+      <div class="control-label">
+        <span>(c) 环间爆炸间隙 <i>g</i></span>
+        <span class="value" id="val-gap">0.45</span>
+      </div>
+      <input type="range" id="param-gap" min="0.0" max="2.0" step="0.05" value="0.45">
+    </div>
+
+    <!-- Parameter (d): Cutaway Sweep Angle {number} -->
+    <div class="control-group">
+      <div class="control-label">
+        <span>(d) 剖切弧度 (角度 {number})</span>
+        <span class="value" id="val-angle">180°</span>
+      </div>
+      <input type="range" id="param-angle" min="30" max="360" step="5" value="180">
+    </div>
+
+    <div class="section-title">2. 辅助尺寸控制</div>
+    <div class="control-group">
+      <div class="control-label">
+        <span>环体轴向厚度 <i>H</i> (默认随宽度)</span>
+        <span class="value" id="val-height">1.00</span>
+      </div>
+      <input type="range" id="param-height" min="0.3" max="3.0" step="0.05" value="1.00">
+    </div>
+
+    <div class="section-title">3. 常用推荐视角预设</div>
+    <div class="btn-row">
+      <button onclick="setPresetView('iso')">经典等轴透视</button>
+      <button onclick="setPresetView('front')">正剖面 (r-z 展开)</button>
+    </div>
+    <div class="btn-row">
+      <button onclick="setPresetView('top')">俯视 (同心环截面)</button>
+      <button onclick="setPresetView('angle270')">270° 缺口透视</button>
+    </div>
+
+    <div class="section-title">4. 五环图例与物理对应</div>
+    <div class="legend-grid">
+      <div class="legend-item"><div class="color-dot" style="background:#F59E0B"></div><strong>母环 (P)</strong>：主体单元</div>
+      <div class="legend-item"><div class="color-dot" style="background:#3B82F6"></div><strong>小环 (W)</strong>：内侧径向邻居</div>
+      <div class="legend-item"><div class="color-dot" style="background:#8B5CF6"></div><strong>大环 (E)</strong>：外侧径向邻居</div>
+      <div class="legend-item"><div class="color-dot" style="background:#10B981"></div><strong>远环 (N)</strong>：远离中截面</div>
+      <div class="legend-item"><div class="color-dot" style="background:#06B6D4"></div><strong>近环 (S)</strong>：靠近中截面</div>
+      <div class="legend-item"><div class="color-dot" style="background:#94A3B8"></div><strong>中轴线 (r=0)</strong></div>
+    </div>
+
+    <div class="section-title">5. 实时几何与相机状态</div>
+    <div class="info-box" id="state-info">
+      计算中...
+    </div>
+
+    <div style="margin-top: 18px;">
+      <button class="primary" style="width:100%;" onclick="copyConfiguration()">📋 一键复制参数与视角代码</button>
+    </div>
+  </div>
+
+  <div id="toast">已成功复制参数与相机视角代码到剪贴板！</div>
+
+  <div class="axis-hint">
+    鼠标左键：3D 旋转 | 鼠标右键：平移 | 滚轮：无级缩放
+  </div>
+
+  <script>
+    // --- 1. Scene, Camera, Renderer Setup ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0F172A);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(13, 9, 14);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(3.2, 0, 0);
+
+    // --- 2. Lighting Setup ---
+    const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.65);
+    scene.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0xFFFFFF, 0.85);
+    dirLight1.position.set(15, 25, 20);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0x38BDF8, 0.4);
+    dirLight2.position.set(-15, -10, -15);
+    scene.add(dirLight2);
+
+    // Ground Grid Helper
+    const gridHelper = new THREE.GridHelper(24, 24, 0x334155, 0x1E293B);
+    gridHelper.position.y = -3.5;
+    scene.add(gridHelper);
+
+    // Central Axis Line (r = 0)
+    const axisMat = new THREE.LineDashedMaterial({ color: 0x94A3B8, dashSize: 0.3, gapSize: 0.15, linewidth: 2 });
+    const axisGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, -6, 0),
+      new THREE.Vector3(0, 6, 0)
+    ]);
+    const axisLine = new THREE.Line(axisGeo, axisMat);
+    axisLine.computeLineDistances();
+    scene.add(axisLine);
+
+    // --- 3. Dynamic 5-Ring Group ---
+    const ringsGroup = new THREE.Group();
+    scene.add(ringsGroup);
+
+    // Materials definition
+    const colors = {
+      mother: 0xF59E0B, // Golden Amber
+      small:  0x3B82F6, // Vibrant Blue
+      large:  0x8B5CF6, // Purple
+      far:    0x10B981, // Emerald Green
+      near:   0x06B6D4  // Cyan
+    };
+
+    function createRingSectorGeometry(rIn, rOut, height, sweepAngleDeg) {
+      const sweepRad = (sweepAngleDeg * Math.PI) / 180.0;
+      const startAngle = -sweepRad / 2.0;
+      const endAngle = sweepRad / 2.0;
+
+      const shape = new THREE.Shape();
+      const segs = Math.max(24, Math.floor(64 * (sweepAngleDeg / 360.0)));
+
+      if (sweepAngleDeg >= 359.9) {
+        shape.absarc(0, 0, rOut, 0, Math.PI * 2, false);
+        const hole = new THREE.Path();
+        hole.absarc(0, 0, rIn, 0, Math.PI * 2, true);
+        shape.holes.push(hole);
+      } else {
+        // Outer arc
+        shape.absarc(0, 0, rOut, startAngle, endAngle, false);
+        // Line to inner end
+        shape.lineTo(rIn * Math.cos(endAngle), rIn * Math.sin(endAngle));
+        // Inner arc back
+        shape.absarc(0, 0, rIn, endAngle, startAngle, true);
+        // Line back to outer start
+        shape.lineTo(rOut * Math.cos(startAngle), rOut * Math.sin(startAngle));
+      }
+
+      const extrudeSettings = {
+        depth: height,
+        bevelEnabled: false,
+        curveSegments: segs
+      };
+
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      // Shape is in XY plane, extruded along Z.
+      // To align with cylindrical coordinates where axis is Y (vertical):
+      geo.rotateX(-Math.PI / 2);
+      // Center along Y
+      geo.translate(0, -height / 2, 0);
+      return geo;
+    }
+
+    function createRingMesh(rIn, rOut, height, angleDeg, colorHex, posY) {
+      const geo = createRingSectorGeometry(rIn, rOut, height, angleDeg);
+      const mat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        roughness: 0.35,
+        metalness: 0.15,
+        transparent: true,
+        opacity: 0.92,
+        side: THREE.DoubleSide
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.y = posY;
+
+      // Add clean edges
+      const edgeGeo = new THREE.EdgesGeometry(geo, 15);
+      const edgeMat = new THREE.LineBasicMaterial({ color: 0x0F172A, linewidth: 2 });
+      const edgeLines = new THREE.LineSegments(edgeGeo, edgeMat);
+      mesh.add(edgeLines);
+
+      return mesh;
+    }
+
+    // --- 4. Model Update Logic ---
+    function updateModel() {
+      // Read values
+      let rIn = parseFloat(document.getElementById('param-r-in').value);
+      let rOut = parseFloat(document.getElementById('param-r-out').value);
+      const gap = parseFloat(document.getElementById('param-gap').value);
+      const angle = parseFloat(document.getElementById('param-angle').value);
+      let height = parseFloat(document.getElementById('param-height').value);
+
+      // Enforce rOut > rIn
+      if (rOut <= rIn + 0.1) {
+        rOut = rIn + 0.1;
+        document.getElementById('param-r-out').value = rOut.toFixed(2);
+      }
+
+      const ringWidth = rOut - rIn;
+
+      // Update UI labels
+      document.getElementById('val-r-in').innerText = rIn.toFixed(2);
+      document.getElementById('val-r-out').innerText = rOut.toFixed(2);
+      document.getElementById('val-gap').innerText = gap.toFixed(2);
+      document.getElementById('val-angle').innerText = angle.toFixed(0) + '°';
+      document.getElementById('val-height').innerText = height.toFixed(2);
+
+      // Clear existing meshes
+      while (ringsGroup.children.length > 0) {
+        const obj = ringsGroup.children[0];
+        if (obj.geometry) obj.geometry.dispose();
+        ringsGroup.remove(obj);
+      }
+
+      // Calculations of 5 rings
+      // 1. Small Ring (Inner W)
+      const r_small_in = rIn;
+      const r_small_out = rOut;
+
+      // 2. Mother Ring (Center P)
+      const r_mother_in = r_small_out + gap;
+      const r_mother_out = r_mother_in + ringWidth;
+
+      // 3. Large Ring (Outer E)
+      const r_large_in = r_mother_out + gap;
+      const r_large_out = r_large_in + ringWidth;
+
+      // 4. Far Ring (Top N, +z)
+      const y_far = height + gap;
+
+      // 5. Near Ring (Bottom S, -z)
+      const y_near = -(height + gap);
+
+      // Create meshes
+      const meshSmall = createRingMesh(r_small_in, r_small_out, height, angle, colors.small, 0);
+      const meshMother = createRingMesh(r_mother_in, r_mother_out, height, angle, colors.mother, 0);
+      const meshLarge = createRingMesh(r_large_in, r_large_out, height, angle, colors.large, 0);
+      const meshFar = createRingMesh(r_mother_in, r_mother_out, height, angle, colors.far, y_far);
+      const meshNear = createRingMesh(r_mother_in, r_mother_out, height, angle, colors.near, y_near);
+
+      ringsGroup.add(meshSmall);
+      ringsGroup.add(meshMother);
+      ringsGroup.add(meshLarge);
+      ringsGroup.add(meshFar);
+      ringsGroup.add(meshNear);
+
+      // Update OrbitControls target to center on the Mother Ring
+      const centerR = (r_mother_in + r_mother_out) / 2.0;
+      controls.target.set(centerR * 0.8, 0, 0);
+
+      updateInfoBox(rIn, rOut, ringWidth, height, gap, angle);
+    }
+
+    function updateInfoBox(rIn, rOut, width, height, gap, angle) {
+      const pos = camera.position;
+      const dist = pos.distanceTo(controls.target);
+      const rMotherMid = (rOut + gap + width / 2).toFixed(2);
+
+      const infoHtml = `
+<strong>[环体几何参数]</strong><br>
+• 小环内径: ${rIn.toFixed(2)} | 外径: ${rOut.toFixed(2)}<br>
+• 统一宽度 Δr: ${width.toFixed(2)} | 厚度 Δz: ${height.toFixed(2)}<br>
+• 环间间距 g: ${gap.toFixed(2)} | 剖切弧度: ${angle}°<br>
+• 母环中位半径: ${rMotherMid}<br>
+<br>
+<strong>[实时相机视角 (Camera)]</strong><br>
+• 坐标 (x,y,z): (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})<br>
+• 观察中心 (target): (${controls.target.x.toFixed(2)}, ${controls.target.y.toFixed(2)}, ${controls.target.z.toFixed(2)})<br>
+• 视距 (distance): ${dist.toFixed(2)}
+      `.trim();
+      document.getElementById('state-info').innerHTML = infoHtml;
+    }
+
+    // --- 5. Presets ---
+    function setPresetView(type) {
+      if (type === 'iso') {
+        camera.position.set(12.5, 9.5, 13.5);
+        document.getElementById('param-angle').value = 180;
+      } else if (type === 'front') {
+        camera.position.set(3.5, 0.5, 18.0);
+        document.getElementById('param-angle').value = 180;
+      } else if (type === 'top') {
+        camera.position.set(3.5, 20.0, 0.1);
+        document.getElementById('param-angle').value = 360;
+      } else if (type === 'angle270') {
+        camera.position.set(13.0, 11.0, 12.0);
+        document.getElementById('param-angle').value = 270;
+      }
+      updateModel();
+      controls.update();
+    }
+
+    // --- 6. Event Listeners ---
+    ['param-r-in', 'param-r-out', 'param-gap', 'param-angle', 'param-height'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateModel);
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    controls.addEventListener('change', () => {
+      const rIn = parseFloat(document.getElementById('param-r-in').value);
+      const rOut = parseFloat(document.getElementById('param-r-out').value);
+      const gap = parseFloat(document.getElementById('param-gap').value);
+      const angle = parseFloat(document.getElementById('param-angle').value);
+      const height = parseFloat(document.getElementById('param-height').value);
+      updateInfoBox(rIn, rOut, rOut - rIn, height, gap, angle);
+    });
+
+    // --- 7. Copy Configuration Function ---
+    function copyConfiguration() {
+      const rIn = parseFloat(document.getElementById('param-r-in').value);
+      const rOut = parseFloat(document.getElementById('param-r-out').value);
+      const gap = parseFloat(document.getElementById('param-gap').value);
+      const angle = parseFloat(document.getElementById('param-angle').value);
+      const height = parseFloat(document.getElementById('param-height').value);
+      const width = rOut - rIn;
+
+      const pos = camera.position;
+      const target = controls.target;
+
+      const configText = `
+### FVM 五环控制体选定参数配置
+\`\`\`json
+{
+  "small_ring": {
+    "r_in": ${rIn.toFixed(2)},
+    "r_out": ${rOut.toFixed(2)}
+  },
+  "uniform_dimensions": {
+    "width_delta_r": ${width.toFixed(2)},
+    "height_delta_z": ${height.toFixed(2)}
+  },
+  "layout": {
+    "gap": ${gap.toFixed(2)},
+    "cutaway_angle_deg": ${angle}
+  },
+  "camera": {
+    "position": [${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}],
+    "target": [${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}]
+  }
+}
+\`\`\`
+`.trim();
+
+      navigator.clipboard.writeText(configText).then(() => {
+        showToast();
+      }).catch(err => {
+        // Fallback prompt
+        prompt('请复制以下配置文本：', configText);
+      });
+    }
+
+    function showToast() {
+      const toast = document.getElementById('toast');
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    // --- 8. Animation Loop ---
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Initialize
+    updateModel();
+    animate();
+  </script>
+</body>
+</html>

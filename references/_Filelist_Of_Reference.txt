@@ -1,0 +1,11 @@
+卷 Data 的文件夹 PATH 列表
+卷序列号为 6497-C20A
+D:.
+    Chinese_medicinal_materials__drying_technologies_advancements___Principles__energy_performance__and_influence_on_the_bioactive_components.pdf
+    Effects_of_drying_variables_on_the_characteristic_of_the_hot_air_drying_for_gastrodia_elata_Experiments_and_multi-variable_model.pdf
+    Modelling_shrinkage_during_convective_drying_of_food_materials_a_review.pdf
+    Research_Progress_Regarding_Heat_and_Mass_Transfer_Characteristics_of_Agricultural_Products_Under_Different_Drying_Methods,_and_Associated_Applications_A_Review.pdf
+    _Filelist_Of_Reference.txt
+    
+没有子文件夹 
+

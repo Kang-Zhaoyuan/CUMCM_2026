@@ -1,4 +1,4 @@
-﻿# LaTeX auxiliary files
+# LaTeX auxiliary files
 *.aux
 *.bbl
 *.blg
@@ -21,6 +21,9 @@
 *.run.xml
 *.xdv
 
+# Ensure paper PDF is tracked
+!main.pdf
+
 # Python
 __pycache__/
 *.py[cod]
@@ -34,6 +37,11 @@ env/
 .DS_Store
 Thumbs.db
 Desktop.ini
+ehthumbs.db
+
+# Office Temporary / Lock files
+~$*
+.~*
 
 # Editor directories and files
 .vscode/

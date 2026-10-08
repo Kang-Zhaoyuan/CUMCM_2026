@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="D:/HIT/数模2026/eda_figures/three.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { background: #FFFFFF; overflow: hidden; width: 2600px; height: 2600px; }
+    #container { width: 2600px; height: 2600px; }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <script>
+    const width = 2600;
+    const height = 2600;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xFFFFFF);
+
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+    camera.position.set(-1.6650, 2.7900, -13.3650);
+    const target = new THREE.Vector3(3.3000, 0.0000, 0.0000);
+    camera.lookAt(target);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(1);
+    renderer.setClearColor(0xFFFFFF, 1.0);
+    document.getElementById('container').appendChild(renderer.domElement);
+
+    const r_small_in = 2.10;
+    const r_small_out = 3.25;
+    const delta_r = 1.15;
+    const delta_z = 1.10;
+    const gap = 0.30;
+    const sweepAngleDeg = 120.0;
+
+    const r_mother_in = r_small_out + gap; // 3.55
+    const r_mother_out = r_mother_in + delta_r; // 4.70
+    const r_large_in = r_mother_out + gap; // 5.00
+    const r_large_out = r_large_in + delta_r; // 6.15
+
+    const y_far = delta_z + gap; // 1.40
+    const y_near = -(delta_z + gap); // -1.40
+
+    function createRingSectorGeometry(rIn, rOut, h, sweepDeg) {
+      const sweepRad = (sweepDeg * Math.PI) / 180.0;
+      const startAngle = -sweepRad / 2.0;
+      const endAngle = sweepRad / 2.0;
+
+      const shape = new THREE.Shape();
+      const segs = Math.max(32, Math.floor(96 * (sweepDeg / 360.0)));
+
+      shape.absarc(0, 0, rOut, startAngle, endAngle, false);
+      shape.lineTo(rIn * Math.cos(endAngle), rIn * Math.sin(endAngle));
+      shape.absarc(0, 0, rIn, endAngle, startAngle, true);
+      shape.lineTo(rOut * Math.cos(startAngle), rOut * Math.sin(startAngle));
+
+      const extrudeSettings = {
+        depth: h,
+        bevelEnabled: false,
+        curveSegments: segs
+      };
+
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(0, -h / 2, 0);
+      return geo;
+    }
+
+    const whiteMaterial = new THREE.MeshBasicMaterial({
+      color: 0xFFFFFF,
+      polygonOffset: true,
+      polygonOffsetFactor: 1.0,
+      polygonOffsetUnits: 1.0
+    });
+
+    const blackTubeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const thinEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+
+    function createCylinderBetweenPoints(p1, p2, radius) {
+      const dir = new THREE.Vector3().subVectors(p2, p1);
+      const len = dir.length();
+      if (len < 1e-4) return null;
+      const geom = new THREE.CylinderGeometry(radius, radius, len, 6, 1, false);
+      geom.translate(0, len / 2, 0);
+      geom.rotateX(Math.PI / 2);
+      const mesh = new THREE.Mesh(geom, blackTubeMaterial);
+      mesh.position.copy(p1);
+      mesh.lookAt(p2);
+      return mesh;
+    }
+
+    const ringSpecs = [
+      { name: 'mother', rIn: r_mother_in, rOut: r_mother_out, y: 0.0, isMother: true },
+      { name: 'small',  rIn: r_small_in,  rOut: r_small_out,  y: 0.0, isMother: false },
+      { name: 'large',  rIn: r_large_in,  rOut: r_large_out,  y: 0.0, isMother: false },
+      { name: 'far',    rIn: r_mother_in, rOut: r_mother_out, y: y_far, isMother: false },
+      { name: 'near',   rIn: r_mother_in, rOut: r_mother_out, y: y_near, isMother: false }
+    ];
+
+    ringSpecs.forEach(spec => {
+      const geo = createRingSectorGeometry(spec.rIn, spec.rOut, delta_z, sweepAngleDeg);
+      const mesh = new THREE.Mesh(geo, whiteMaterial);
+      mesh.position.y = spec.y;
+      scene.add(mesh);
+
+      const edgeGeo = new THREE.EdgesGeometry(geo, 15);
+      if (spec.isMother) {
+        const posAttr = edgeGeo.attributes.position;
+        const tubeR = 0.024;
+        for (let i = 0; i < posAttr.count; i += 2) {
+          const p1 = new THREE.Vector3(posAttr.getX(i), posAttr.getY(i) + spec.y, posAttr.getZ(i));
+          const p2 = new THREE.Vector3(posAttr.getX(i+1), posAttr.getY(i+1) + spec.y, posAttr.getZ(i+1));
+          const cyl = createCylinderBetweenPoints(p1, p2, tubeR);
+          if (cyl) scene.add(cyl);
+        }
+      } else {
+        const lineSegments = new THREE.LineSegments(edgeGeo, thinEdgeMaterial);
+        lineSegments.position.y = spec.y;
+        scene.add(lineSegments);
+      }
+    });
+
+    renderer.render(scene, camera);
+  </script>
+</body>
+</html>
